@@ -328,11 +328,17 @@ public class Index {
 
 
             while (p1 != null) {
+            	if (blockQueue.size() == 0)
+					postingDict.put(p1.getTermId(), new Pair<Long, Integer>(mfc.position(), p1.getList().size()));
+            	
                 writePosting(mfc, p1);
                 p1 = index.readPosting(fc1);
             }
 
             while (p2 != null) {
+            	if (blockQueue.size() == 0)
+					postingDict.put(p2.getTermId(), new Pair<Long, Integer>(mfc.position(), p2.getList().size()));
+            	
                 writePosting(mfc, p2);
                 p2 = index.readPosting(fc2);
             }
