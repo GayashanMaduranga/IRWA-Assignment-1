@@ -1,7 +1,5 @@
 package cs276.assignments;
 
-import cs276.util.Pair;
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -10,6 +8,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -20,6 +19,9 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
+import cs276.util.Pair;
+
 import java.util.LinkedList;
 import java.util.List;
 
@@ -56,59 +58,55 @@ public class Index {
 	 * */
 	private static void writePosting(FileChannel fc, PostingList posting)
 			throws IOException {
-		/*
-		 * TODO: Your code here
-		 *	 
-		 */
+
+		//postingDict.put(posting.getTermId(), new Pair<Long, Integer>(fc.position(), posting.getList().size()));
+		BasicIndex index = new BasicIndex();
+		index.writePosting(fc,posting);
 	}
 
-	public static void main(String[] args) throws Throwable {
-		/* Parse command line */
-		if (args.length != 3) {
-			System.err
-					.println("Usage: java Index [Basic|VB|Gamma] data_dir output_dir");
-			return;
-		}
-		
-		
-		/* Get index */
-		String className = "cs276.assignments." + args[0] + "Index";
-		try {
-			Class<?> indexClass = Class.forName(className);
-			index = (BaseIndex) indexClass.newInstance();
-			
-		} catch (Exception e) {
-			System.err
-					.println("Index method must be \"Basic\", \"VB\", or \"Gamma\"");
-			throw new RuntimeException(e);
-		}
-		
-		
+    public static void main(String[] args) throws IOException {
+        /* Parse command line */
+        if (args.length != 3) {
+            System.err
+                    .println("Usage: java Index [Basic|VB|Gamma] data_dir output_dir");
+            return;
+        }
 
-		/* Get root directory */
-		String root = args[1];
-		File rootdir = new File(root);
-		if (!rootdir.exists() || !rootdir.isDirectory()) {
-			System.err.println("Invalid data directory: " + root);
-			return;
-		}
-		
-		
+        /* Get index */
+        String className = "cs276.assignments." + args[0] + "Index";
+        try {
+            Class<?> indexClass = Class.forName(className);
+            index = (BaseIndex) indexClass.newInstance();
+        } catch (Exception e) {
+            System.err
+                    .println("Index method must be \"Basic\", \"VB\", or \"Gamma\"");
+            throw new RuntimeException(e);
+        }
 
-		/* Get output directory */
-		String output = args[2];
-		File outdir = new File(output);
-		if (outdir.exists() && !outdir.isDirectory()) {
-			System.err.println("Invalid output directory: " + output);
-			return;
-		}
+        /* Get root directory */
+        String root = args[1];
+        File rootdir = new File(root);
+        if (!rootdir.exists() || !rootdir.isDirectory()) {
+            System.err.println("Invalid data directory: " + root);
+            return;
+        }
 
-		if (!outdir.exists()) {
-			if (!outdir.mkdirs()) {
-				System.err.println("Create output directory failure");
-				return;
-			}
-		}
+        /* Get output directory */
+        String output = args[2];
+        File outdir = new File(output);
+        if (outdir.exists() && !outdir.isDirectory()) {
+            System.err.println("Invalid output directory: " + output);
+            return;
+        }
+
+        if (!outdir.exists()) {
+            if (!outdir.mkdirs()) {
+                System.err.println("Create output directory failure");
+                return;
+            }
+        }
+
+        
 
 		/* A filter to get rid of all files starting with .*/
 		FileFilter filter = new FileFilter() {
@@ -119,12 +117,10 @@ public class Index {
 			}
 		};
 		
-		
-
-		/* BSBI indexing algorithm */
+        /* BSBI indexing algorithm */
 		File[] dirlist = rootdir.listFiles(filter);
-		
-		
+
+
 		List<Pair<Integer, Integer>> pairs  = new ArrayList<Pair<Integer, Integer>>();
 
 		/* For each block */
@@ -134,14 +130,15 @@ public class Index {
 //
 			File blockDir = new File(root, block.getName());
 			File[] filelist = blockDir.listFiles(filter);
-			
-			
+
+
 			/* For each file */
 			for (File file : filelist) {
 				++totalFileCount;
 				String fileName = block.getName() + "/" + file.getName();
-				 docDict.put(fileName, docIdCounter++);
-				
+				int docID = ++docIdCounter;                                // ##Changes
+				 docDict.put(fileName, docID);
+
 				BufferedReader reader = new BufferedReader(new FileReader(file));
 				String line;
 				while ((line = reader.readLine()) != null) {
@@ -153,91 +150,121 @@ public class Index {
 						 *       documents in which the term occurs
 						 */
 						//int termID = termDict.getOrDefault(token, ++wordIdCounter);
-						
+
 						int termID ;
-						
+
 						if(!termDict.containsKey(token)) {
 							termID = ++wordIdCounter;
 							termDict.put(token, termID);
+
 						}else{
+
 							termID = termDict.get(token);
+
 						}
-						
-						pairs.add(new Pair<>(termID, docIdCounter));
+
+						pairs.add(new Pair<>(termID, docID));
+
 					}
 				}
 				reader.close();
-				
-				
 			}
-			
+
+
+
 			//test code
-			
+
 //			System.out.println(termDict.size());
-			
+
 
 			/* Sort and output */
 			if (!blockFile.createNewFile()) {
 				System.err.println("Create new block failure.");
 				return;
 			}
-			
-			RandomAccessFile bfc = new RandomAccessFile(blockFile, "rw");
-			
+
+				RandomAccessFile bfc = new RandomAccessFile(blockFile, "rw");
+
 			/*
 			 * TODO: Your code here
-			 *       Write all posting lists for all terms to file (bfc) 
+			 *       Write all posting lists for all terms to file (bfc)
 			 */
-			
+
 			Collections.sort(pairs,new Comparator<Pair<Integer, Integer>>() {
 
 				@Override
 				public int compare(Pair<Integer, Integer> arg0, Pair<Integer, Integer> arg1) {
 					// TODO Auto-generated method stub
-					
+
 					int term0 = arg0.getFirst();
 					int doc0 = arg0.getSecond();
 					int term1 = arg1.getFirst();
 					int doc1 = arg1.getSecond();
-					
+
 					int result = 0;
-					
+
 					result = (term0 == term1) ? (doc0 == doc1 ? 0 : (doc0 < doc1 ? -1 : 1)) : (term0 < term1 ? -1 : 1);
-					
+
 					return result;
 				}
 			});
-			
-			int termId;
+
+
+			//pairs.forEach(System.out::println);
+
+			int termId=-1;
             int docId;
-			
+			int previousTermID=-1;
+
+
 			List<Integer> postingList = new LinkedList<>();
+			int counter = 0;
 			 for (Pair<Integer, Integer> p : pairs) {
 	                termId = p.getFirst();
 	                docId = p.getSecond();
-			 }
-			
 
-			 
-			
+					if(previousTermID<termId && termId != -1){
+
+						//save previous posting list
+						PostingList postings = new PostingList(termId,postingList);
+						writePosting(bfc.getChannel(),postings);
+						//for new posting list
+						previousTermID = termId;
+						postingList.clear();
+
+					}else {
+
+					}
+				 postingList.add(Integer.valueOf(docId));
+
+
+			 }
+//
+//			//System.out.println(postingList.toString());
+//
+//			System.out.println(counter);
 			bfc.close();
 		}
-		
-		
-		
-		
+//
+
+
+//
+
+
 
 		/* Required: output total number of files. */
 		System.out.println(totalFileCount);
 
 		/* Merge blocks */
 		while (true) {
-			if (blockQueue.size() <= 1)
+			if (blockQueue.size() <= 1) {
 				break;
+				//postingDict.put(posting.getTermId(), new Pair<Long, Integer>(fc.position(), posting.getList().size()));
+			}
 
 			File b1 = blockQueue.removeFirst();
 			File b2 = blockQueue.removeFirst();
-			
+
 			File combfile = new File(output, b1.getName() + "+" + b2.getName());
 			if (!combfile.createNewFile()) {
 				System.err.println("Create new block failure.");
@@ -247,46 +274,58 @@ public class Index {
 			RandomAccessFile bf1 = new RandomAccessFile(b1, "r");
 			RandomAccessFile bf2 = new RandomAccessFile(b2, "r");
 			RandomAccessFile mf = new RandomAccessFile(combfile, "rw");
-			 
+
 			/*
 			 * TODO: Your code here
 			 *       Combine blocks bf1 and bf2 into our combined file, mf
 			 *       You will want to consider in what order to merge
 			 *       the two blocks (based on term ID, perhaps?).
-			 *       
+			 *
 			 */
-			
+
 			BasicIndex index = new BasicIndex();
-			
+
 			FileChannel fc1 = bf1.getChannel();
             FileChannel fc2 = bf2.getChannel();
             FileChannel mfc = mf.getChannel();
 
             PostingList p1 = index.readPosting(fc1);
             PostingList p2 = index.readPosting(fc2);
-
+			PostingList p3 = null;
             while (p1 != null && p2 != null) {
                 int t1 = p1.getTermId();
                 int t2 = p2.getTermId();
 
                 if (t1 == t2) {
                     // merge postings of the same term
-                    PostingList p3 = mergePostings(p1, p2);
+                    p3 = mergePostings(p1, p2);
 
                     // write p3 to disk
                     writePosting(mfc, p3);
+
                     p1 = index.readPosting(fc1);
                     p2 = index.readPosting(fc2);
+
+					if (blockQueue.size() == 0)
+						postingDict.put(p3.getTermId(), new Pair<Long, Integer>(mfc.position(), p3.getList().size()));
                 } else if (t1 < t2) {
                     // write p1
                     writePosting(mfc, p1);
                     p1 = index.readPosting(fc1);
+
+					if (blockQueue.size() == 0)
+						postingDict.put(p1.getTermId(), new Pair<Long, Integer>(mfc.position(), p1.getList().size()));
                 } else {
                     // write p2
                     writePosting(mfc, p2);
                     p2 = index.readPosting(fc2);
+
+					if (blockQueue.size() == 0)
+						postingDict.put(p2.getTermId(), new Pair<Long, Integer>(mfc.position(), p2.getList().size()));
                 }
             }
+
+
 
             while (p1 != null) {
                 writePosting(mfc, p1);
@@ -297,7 +336,7 @@ public class Index {
                 writePosting(mfc, p2);
                 p2 = index.readPosting(fc2);
             }
-			
+
 			bf1.close();
 			bf2.close();
 			mf.close();
@@ -374,11 +413,11 @@ public class Index {
     }
     
     private static Integer popNextOrNull(Iterator<Integer> iter) {
-        if (iter.hasNext()) {
-            return iter.next();
-        } else {
-            return null;
-        }
-    }
+		if (iter.hasNext()) {
+			return iter.next();
+		} else {
+			return null;
+		}
+	}
 	
 }
